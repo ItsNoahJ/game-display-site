@@ -228,6 +228,8 @@
   const btnReload = document.getElementById("btn-reload");
   const btnClose = document.getElementById("btn-close");
   const controlsHint = document.getElementById("modal-controls-hint");
+  const modalHeader = document.querySelector(".modal-header");
+  const modalFooter = document.querySelector(".modal-footer");
 
   const state = {
     query: "",
@@ -576,6 +578,31 @@
     iframe.style.height = Math.floor(h) + "px";
   }
 
+  // Size the modal so the STAGE content area is exactly the game's aspect
+  // (16:9 by default) — otherwise the stage ends up wider than the game and
+  // the frame letterboxes with side bars. The CSS 16:9 rule remains the
+  // fallback for "auto" games, mobile, and fullscreen.
+  const MOBILE_QUERY = matchMedia("(max-width: 760px)");
+
+  function sizeModal() {
+    if (!state.openGame || MOBILE_QUERY.matches || document.fullscreenElement) return;
+    const ar = aspectValue(state.openGame);
+    if (!ar) {
+      modal.style.width = "";
+      modal.style.height = "";
+      return;
+    }
+    const stagePad = parseFloat(getComputedStyle(modalStage).paddingLeft) || 0;
+    const chromeH = (modalHeader ? modalHeader.offsetHeight : 0) + (modalFooter ? modalFooter.offsetHeight : 0);
+    const ovlPad = parseFloat(getComputedStyle(overlay).paddingLeft) || 0;
+    const availW = Math.max(1, overlay.clientWidth - ovlPad * 2);
+    const availH = Math.max(1, overlay.clientHeight - ovlPad * 2);
+    let stageH = Math.min(availH - chromeH - stagePad * 2, (availW - stagePad * 2) / ar);
+    stageH = Math.max(120, stageH);
+    modal.style.height = Math.floor(stageH + chromeH + stagePad * 2) + "px";
+    modal.style.width = Math.floor(stageH * ar + stagePad * 2) + "px";
+  }
+
   function buildIframe(game) {
     const iframe = document.createElement("iframe");
     iframe.src = game.file;
@@ -653,6 +680,7 @@
     document.body.classList.add("modal-open");
     document.documentElement.classList.add("modal-open");
 
+    sizeModal();
     fitGameFrame();
 
     // focus the iframe so keyboard controls work immediately
@@ -732,10 +760,20 @@
   document.addEventListener("keydown", handleGlobalKey);
   document.addEventListener("fullscreenchange", () => {
     syncFullscreenLabel();
+    if (document.fullscreenElement) {
+      // fullscreen fills the screen — let the CSS/UA sizing take over
+      modal.style.width = "";
+      modal.style.height = "";
+    } else {
+      sizeModal();
+    }
     fitGameFrame();
   });
   window.addEventListener("resize", () => {
-    if (state.openGame) fitGameFrame();
+    if (state.openGame) {
+      sizeModal();
+      fitGameFrame();
+    }
   });
 
   // Lightweight focus trap: keep Tab cycling within the modal toolbar.
