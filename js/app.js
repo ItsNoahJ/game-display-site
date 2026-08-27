@@ -25,6 +25,7 @@
    *   <meta name="description" content="Short hook.">
    *   <meta name="keywords" content="Arcade, Puzzle">
    *   <meta name="controls" content="Arrow keys to move">
+   *   <meta name="aspect-ratio" content="16:9 | auto">
    * Missing tags fall back to sensible defaults.
    * ------------------------------------------------------------ */
   const DISCOVERY = {
@@ -114,7 +115,7 @@
   }
 
   async function fetchGameMeta(file) {
-    const out = { description: null, keywords: [], controls: null };
+    const out = { description: null, keywords: [], controls: null, aspect: null };
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 2500);
@@ -134,6 +135,8 @@
       if (kw) out.keywords = kw.split(",").map((s) => s.trim()).filter(Boolean);
       const ctl = grab("controls");
       if (ctl) out.controls = ctl;
+      const ar = grab("aspect-ratio");
+      if (ar) out.aspect = ar;
     } catch (_) {
       /* timeout or network failure — fall back to defaults */
     }
@@ -152,6 +155,7 @@
       file,
       tags: meta.keywords.length ? meta.keywords : ["Arcade"],
       controls: meta.controls || "Use keyboard or mouse inside the game",
+      aspect: meta.aspect || "16:9",
       accent1: accent[0],
       accent2: accent[1],
       thumb: THUMBS[id] ? id : "auto",
@@ -536,6 +540,42 @@
   /* ------------------------------------------------------------
    * Theater Modal
    * ------------------------------------------------------------ */
+
+  // Games are shown in a fixed-aspect frame (16:9 by default) that
+  // letterboxes inside the stage, so a game's internal render buffer
+  // never gets stretched by an arbitrary window shape. "auto" opts
+  // a game out and lets it fill the stage freely.
+  function aspectValue(game) {
+    const raw = String((game && game.aspect) || "16:9");
+    if (/^(auto|free|any)$/i.test(raw)) return 0;
+    const m = raw.match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
+    if (!m) return 16 / 9;
+    const a = parseFloat(m[1]) / parseFloat(m[2]);
+    return a > 0 && isFinite(a) ? a : 16 / 9;
+  }
+
+  function fitGameFrame() {
+    const iframe = state.iframe;
+    if (!iframe || !state.openGame || !overlay.classList.contains("open")) return;
+    const ar = aspectValue(state.openGame);
+    if (!ar) {
+      iframe.style.width = "";
+      iframe.style.height = "";
+      return;
+    }
+    const pad = parseFloat(getComputedStyle(modalStage).paddingLeft) || 0;
+    const availW = Math.max(1, modalStage.clientWidth - pad * 2);
+    const availH = Math.max(1, modalStage.clientHeight - pad * 2);
+    let w = availW;
+    let h = availW / ar;
+    if (h > availH) {
+      h = availH;
+      w = availH * ar;
+    }
+    iframe.style.width = Math.floor(w) + "px";
+    iframe.style.height = Math.floor(h) + "px";
+  }
+
   function buildIframe(game) {
     const iframe = document.createElement("iframe");
     iframe.src = game.file;
@@ -546,6 +586,7 @@
     iframe.allow = "fullscreen; gamepad; autoplay";
     iframe.addEventListener("load", () => {
       stopLoadSpinner();
+      fitGameFrame();
       focusGame();
       forwardKeys(iframe);
     });
@@ -612,6 +653,8 @@
     document.body.classList.add("modal-open");
     document.documentElement.classList.add("modal-open");
 
+    fitGameFrame();
+
     // focus the iframe so keyboard controls work immediately
     focusGame();
   }
@@ -626,6 +669,7 @@
       state.iframe.remove();
       state.iframe = buildIframe(game);
       modalStage.appendChild(state.iframe);
+      fitGameFrame();
     }
   }
 
@@ -686,7 +730,13 @@
   }
 
   document.addEventListener("keydown", handleGlobalKey);
-  document.addEventListener("fullscreenchange", syncFullscreenLabel);
+  document.addEventListener("fullscreenchange", () => {
+    syncFullscreenLabel();
+    fitGameFrame();
+  });
+  window.addEventListener("resize", () => {
+    if (state.openGame) fitGameFrame();
+  });
 
   // Lightweight focus trap: keep Tab cycling within the modal toolbar.
   modal.addEventListener("keydown", (e) => {

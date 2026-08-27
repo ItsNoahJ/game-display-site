@@ -48,6 +48,11 @@ no dependencies, no CDN — it runs offline and deployable to **GitHub Pages**.
      ```
    - Missing tags fall back to defaults (description → generic blurb,
      keywords → `Arcade`, controls → generic hint).
+   - Games play in a **16:9 frame** that letterboxes inside the modal, so the
+     game's viewport never changes shape with the browser window. A game that
+     adapts to any window can opt out with
+     `<meta name="aspect-ratio" content="auto">`; other ratios are supported too
+     (`<meta name="aspect-ratio" content="4:3">`).
    - Thumbnails are drawn on a `<canvas>` — see the `THUMBS` painters in `app.js`
      for `id → drawer` mapping; anything without a painter gets a monogram tile
      with an accent color chosen from the file name.
