@@ -37,6 +37,16 @@
 
   let GAMES = [];
 
+  // Image formats accepted as card artwork next to a game file.
+  // Order = preference when several formats exist for the same game.
+  const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif", "svg", "avif"];
+
+  function isDiscoverableFile(name) {
+    if (/\.html?$/i.test(name)) return true;
+    const ext = name.split(".").pop().toLowerCase();
+    return IMAGE_EXTS.includes(ext);
+  }
+
   function isGitHubPagesHost() {
     return location.hostname.replace(/\.$/, "").endsWith(".github.io");
   }
@@ -54,7 +64,7 @@
       const data = await res.json();
       if (!Array.isArray(data)) return [null, "The `games` path in the repository is not a folder."];
       const names = data
-        .filter((e) => e.type === "file" && /\.html?$/i.test(e.name))
+        .filter((e) => e.type === "file" && isDiscoverableFile(e.name))
         .map((e) => e.name)
         .sort(compareNames);
       return [names, null];
@@ -79,7 +89,7 @@
         } catch (_) {}
         if (href.startsWith("/")) href = href.slice(1);
         const base = href.split("/").pop();
-        if (!base || base === ".." || base === "." || !/\.html?$/i.test(base)) return;
+        if (!base || base === ".." || base === "." || !isDiscoverableFile(base)) return;
         let name;
         try {
           name = decodeURIComponent(base);
@@ -185,7 +195,28 @@
       [names, error] = await listViaDirectory();
     }
     if (names === null) return { games: [], error };
-    return { games: await Promise.all(names.map(buildGame)), error: null };
+    const htmlNames = names.filter((n) => /\.html?$/i.test(n));
+    const imageNames = names.filter((n) => !/\.html?$/i.test(n));
+    // basename (lowercased) -> best matching image file; earlier extensions win.
+    const artByKey = new Map();
+    imageNames
+      .slice()
+      .sort(
+        (a, b) =>
+          (IMAGE_EXTS.indexOf(a.split(".").pop().toLowerCase()) -
+            IMAGE_EXTS.indexOf(b.split(".").pop().toLowerCase())) ||
+          compareNames(a, b)
+      )
+      .forEach((f) => {
+        const key = f.replace(/\.[^.]+$/i, "").toLowerCase();
+        if (!artByKey.has(key)) artByKey.set(key, f);
+      });
+    const games = await Promise.all(htmlNames.map(buildGame));
+    games.forEach((g) => {
+      const art = artByKey.get(g.id.toLowerCase());
+      g.art = art ? "./games/" + encodeURIComponent(art) : null;
+    });
+    return { games, error: null };
   }
 
   function updateHeaderCount() {
@@ -504,6 +535,7 @@
       card.innerHTML = `
         <div class="game-thumb">
           <canvas width="320" height="180" aria-hidden="true"></canvas>
+          ${game.art ? `<img class="game-thumb-img" src="${game.art}" alt="" loading="lazy" decoding="async">` : ""}
         </div>
         <div class="card-body">
           <h3 class="game-title">${game.title}</h3>

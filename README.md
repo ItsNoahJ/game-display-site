@@ -12,7 +12,8 @@ no dependencies, no CDN — it runs offline and deployable to **GitHub Pages**.
 ├── js/
 │   └── app.js        Game auto-discovery, rendering, filtering, theater modal
 ├── games/
-│   └── Delve.html    Single-file HTML game (auto-detected)
+│   ├── Delve.html    Single-file HTML game (auto-detected)
+│   └── Delve.png     Card artwork (image matching the game name)
 └── README.md
 ```
 
@@ -53,9 +54,21 @@ no dependencies, no CDN — it runs offline and deployable to **GitHub Pages**.
      adapts to any window can opt out with
      `<meta name="aspect-ratio" content="auto">`; other ratios are supported too
      (`<meta name="aspect-ratio" content="4:3">`).
-   - Thumbnails are drawn on a `<canvas>` — see the `THUMBS` painters in `app.js`
-     for `id → drawer` mapping; anything without a painter gets a monogram tile
-     with an accent color chosen from the file name.
+   - **Card artwork:** drop an image next to the game file with the same base
+     name and it becomes the card's artwork automatically:
+     ```
+     games/
+     ├── mygame.html
+     └── mygame.png   ← artwork (png, jpg, jpeg, webp, gif, svg, avif)
+     ```
+     If several formats exist for one game, the first of
+     `png → jpg → jpeg → webp → gif → svg → avif` wins. Matching is
+     case-insensitive (`MYGAME.PNG` works for `mygame.html`). Images without a
+     matching game are ignored.
+   - Thumbnails: games without artwork get a procedurally drawn canvas thumb —
+     see the `THUMBS` painters in `app.js` for `id → drawer` mapping; anything
+     without a painter gets a monogram tile with an accent color chosen from
+     the file name.
 
 4. **Search and tag filters pick everything up automatically.**
 
