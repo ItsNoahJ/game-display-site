@@ -498,8 +498,9 @@ a:hover { text-decoration-color: rgba(220,38,38,0.9); color: #fff; }
 }
 .modal-overlay.open { opacity: 1; visibility: visible; }
 .modal {
-  width: min(1060px, 100%);
-  height: min(76vh, 780px);
+  width: min(96vw, calc((100dvh - 56px) * 16 / 9));
+  height: auto;
+  aspect-ratio: 16 / 9;
   display: flex;
   flex-direction: column;
   background: #1c1c1c;
