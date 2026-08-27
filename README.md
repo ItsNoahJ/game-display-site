@@ -13,7 +13,7 @@ no dependencies, no CDN — it runs offline and deployable to **GitHub Pages**.
 │   └── app.js        Game auto-discovery, rendering, filtering, theater modal
 ├── games/
 │   ├── Delve.html    Single-file HTML game (auto-detected)
-│   └── Delve.png     Card artwork (image matching the game name)
+│   └── Delve.webp    Card artwork (image matching the game name)
 └── README.md
 ```
 
@@ -64,7 +64,9 @@ no dependencies, no CDN — it runs offline and deployable to **GitHub Pages**.
      If several formats exist for one game, the first of
      `png → jpg → jpeg → webp → gif → svg → avif` wins. Matching is
      case-insensitive (`MYGAME.PNG` works for `mygame.html`). Images without a
-     matching game are ignored.
+     matching game are ignored. **Use WebP if possible** — it's the smallest
+     format by far (a raw game screenshot saved as PNG can be several MB and
+     slows down the first paint of the card).
    - Thumbnails: games without artwork get a procedurally drawn canvas thumb —
      see the `THUMBS` painters in `app.js` for `id → drawer` mapping; anything
      without a painter gets a monogram tile with an accent color chosen from

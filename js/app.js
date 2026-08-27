@@ -559,7 +559,21 @@
         }
       });
       grid.appendChild(card);
-      drawThumb(game, card.querySelector("canvas"));
+      const canvas = card.querySelector("canvas");
+      const img = card.querySelector("img.game-thumb-img");
+      if (img) {
+        // Keep the thumb dark until the artwork is decoded: the img stays
+        // invisible (opacity 0 via CSS) until its load event, and the
+        // procedural canvas painter runs only on error — nothing flashes.
+        img.addEventListener("load", () => img.classList.add("loaded"));
+        img.addEventListener("error", () => {
+          img.remove();
+          drawThumb(game, canvas);
+        });
+        if (img.complete && img.naturalWidth) img.classList.add("loaded");
+      } else {
+        drawThumb(game, canvas);
+      }
     });
   }
 
