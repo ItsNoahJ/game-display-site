@@ -99,6 +99,9 @@ browsers block the fetch the page uses to discover games.
 | Key | Action |
 |---|---|
 | `Esc` | Close the game (stops audio/loops, removes iframe) |
-| `F` | Toggle fullscreen |
+| `F` | Passed through to the game — the site never uses it (Delve needs it) |
 | `R` | Reload / restart the game |
 | `Tab` | Cycles modal toolbar (focus trap) |
+
+Fullscreen is toggled from the ⛶ button that hovers over the game frame.
+Hover the frame when the controls are hidden.

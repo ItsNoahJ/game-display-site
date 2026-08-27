@@ -512,40 +512,16 @@ a:hover { text-decoration-color: rgba(220,38,38,0.9); color: #fff; }
   box-shadow: 0 16px 48px rgba(0,0,0,0.6);
 }
 .modal-overlay.open .modal { transform: translateY(0); }
-.modal-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-  background: #1e1e1e;
-}
-.modal-title {
-  flex-grow: 1;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--paper);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.modal-controls { display: flex; align-items: center; gap: 6px; }
 .tool-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  line-height: 1;
   color: var(--text-muted);
-  background: transparent;
+  background: rgba(26, 26, 26, 0.65);
   border: 1px solid var(--line);
   border-radius: 6px;
   transition: all var(--transition-s);
@@ -574,32 +550,25 @@ a:hover { text-decoration-color: rgba(220,38,38,0.9); color: #fff; }
   border-radius: 8px;
   background: #000;
 }
-.modal-footer {
+
+/* Floating player controls — appear on hover over the game container,
+   no chrome bar of their own. On touch devices they stay visible. */
+.modal-tools {
+  position: absolute;
+  top: 14px;
+  right: 14px;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  border-top: 1px solid var(--line);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  flex-shrink: 0;
-  background: #1a1a1a;
+  gap: 6px;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-s);
 }
-.modal-footer kbd {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  padding: 2px 5px;
-  border-radius: 3px;
-  background: #252525;
-  border: 1px solid var(--line);
-  color: var(--text-muted);
-  text-transform: none;
-  letter-spacing: 0;
+.modal:hover .modal-tools,
+.modal-tools:focus-within { opacity: 1; pointer-events: auto; }
+@media (hover: none) {
+  .modal-tools { opacity: 0.85; pointer-events: auto; }
 }
-.modal-footer .spacer { flex-grow: 1; }
 
 /* ---------- Footer ---------- */
 .site-footer {
@@ -642,8 +611,6 @@ a:hover { text-decoration-color: rgba(220,38,38,0.9); color: #fff; }
   .site-main, .footer-inner { padding-left: 16px; padding-right: 16px; }
   .modal-overlay { padding: 0; }
   .modal { width: 100%; height: 100dvh; border-radius: 0; border-left: none; border-right: none; }
-  .modal-footer { display: none; }
-  .tool-btn span.txt { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

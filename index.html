@@ -78,28 +78,19 @@
   <!-- Theater modal for playing games -->
   <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-label="Game player">
     <div class="modal" id="modal">
-      <header class="modal-header">
-        <h2 class="modal-title" id="modal-title">Game</h2>
-        <div class="modal-controls">
-          <button class="tool-btn" id="btn-fullscreen" type="button" title="Toggle fullscreen (F)">
-            <span aria-hidden="true" class="fs-icon">⛶</span><span class="txt">Fullscreen</span>
+      <div class="modal-stage" id="modal-stage">
+        <div class="modal-tools" id="modal-tools">
+          <button class="tool-btn" id="btn-fullscreen" type="button" title="Fullscreen" aria-label="Toggle fullscreen">
+            <span aria-hidden="true">&#x26F6;</span>
           </button>
-          <button class="tool-btn" id="btn-reload" type="button" title="Reload game (R)">
-            <span aria-hidden="true">↻</span><span class="txt">Reload</span>
+          <button class="tool-btn" id="btn-reload" type="button" title="Reload game" aria-label="Reload game">
+            <span aria-hidden="true">&#x21BB;</span>
           </button>
-          <button class="tool-btn close-btn" id="btn-close" type="button" title="Close (Esc)">
-            <span aria-hidden="true">&times;</span><span class="txt">Close</span>
+          <button class="tool-btn close-btn" id="btn-close" type="button" title="Close (Esc)" aria-label="Close game">
+            <span aria-hidden="true">&times;</span>
           </button>
         </div>
-      </header>
-      <div class="modal-stage" id="modal-stage"></div>
-      <footer class="modal-footer">
-        <span>Tip: <kbd>Esc</kbd> close</span>
-        <span><kbd>F</kbd> fullscreen</span>
-        <span><kbd>R</kbd> restart</span>
-        <span class="spacer"></span>
-        <span id="modal-controls-hint">Use keyboard or mouse inside the game</span>
-      </footer>
+      </div>
     </div>
   </div>
 

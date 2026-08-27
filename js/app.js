@@ -222,14 +222,10 @@
   const tagFilter = document.getElementById("tag-filter");
   const overlay = document.getElementById("modal-overlay");
   const modal = document.getElementById("modal");
-  const modalTitle = document.getElementById("modal-title");
   const modalStage = document.getElementById("modal-stage");
   const btnFullscreen = document.getElementById("btn-fullscreen");
   const btnReload = document.getElementById("btn-reload");
   const btnClose = document.getElementById("btn-close");
-  const controlsHint = document.getElementById("modal-controls-hint");
-  const modalHeader = document.querySelector(".modal-header");
-  const modalFooter = document.querySelector(".modal-footer");
 
   const state = {
     query: "",
@@ -593,13 +589,12 @@
       return;
     }
     const stagePad = parseFloat(getComputedStyle(modalStage).paddingLeft) || 0;
-    const chromeH = (modalHeader ? modalHeader.offsetHeight : 0) + (modalFooter ? modalFooter.offsetHeight : 0);
     const ovlPad = parseFloat(getComputedStyle(overlay).paddingLeft) || 0;
     const availW = Math.max(1, overlay.clientWidth - ovlPad * 2);
     const availH = Math.max(1, overlay.clientHeight - ovlPad * 2);
-    let stageH = Math.min(availH - chromeH - stagePad * 2, (availW - stagePad * 2) / ar);
+    let stageH = Math.min(availH - stagePad * 2, (availW - stagePad * 2) / ar);
     stageH = Math.max(120, stageH);
-    modal.style.height = Math.floor(stageH + chromeH + stagePad * 2) + "px";
+    modal.style.height = Math.floor(stageH + stagePad * 2) + "px";
     modal.style.width = Math.floor(stageH * ar + stagePad * 2) + "px";
   }
 
@@ -620,13 +615,15 @@
     return iframe;
   }
 
-  // Forward Escape/F/R to the host page even while the game has focus.
+  // Forward Escape/R to the host page even while the game has focus. F is
+  // deliberately NOT forwarded: many games (e.g. Delve) use F in their own
+  // mechanics, so the fullscreen shortcut stays on the toolbar button only.
   function forwardKeys(iframe) {
     try {
       const win = iframe.contentWindow;
       if (!win) return;
       win.addEventListener("keydown", (e) => {
-        if (["Escape", "f", "r"].includes(e.key)) handleGlobalKey(e);
+        if (["Escape", "r"].includes(e.key)) handleGlobalKey(e);
       });
     } catch (_) {
       /* sandbox or cross-origin — ignore */
@@ -669,8 +666,7 @@
     state.openGame = game;
     state.lastTrigger = trigger || null;
 
-    modalTitle.textContent = `${game.title} — ${game.tags.join(" · ")}`;
-    controlsHint.textContent = `${game.controls || "Use keyboard or mouse inside the game"}`;
+    overlay.setAttribute("aria-label", `${game.title} — game player`);
 
     showLoadSpinner();
     state.iframe = buildIframe(game);
@@ -732,9 +728,8 @@
 
   function syncFullscreenLabel() {
     const isFs = !!document.fullscreenElement;
-    btnFullscreen.innerHTML = isFs
-      ? '<span aria-hidden="true">⤢</span><span class="txt">Exit</span>'
-      : '<span aria-hidden="true" class="fs-icon">⛶</span><span class="txt">Fullscreen</span>';
+    btnFullscreen.innerHTML = isFs ? "&#x2922;" : "&#x26F6;";
+    btnFullscreen.title = isFs ? "Exit fullscreen" : "Fullscreen";
   }
 
   /* ------------------------------------------------------------
@@ -747,11 +742,9 @@
       closeModal();
       return;
     }
+    // NO "f" shortcut here: F must stay available to games (Delve uses it).
     const key = e.key.toLowerCase();
-    if (key === "f") {
-      e.preventDefault();
-      toggleFullscreen();
-    } else if (key === "r" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (key === "r" && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       reloadGame();
     }
