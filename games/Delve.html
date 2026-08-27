@@ -289,7 +289,7 @@ canvas.game{position:fixed;inset:0;width:100vw;height:100vh;display:block;image-
        every strobing animation for a calm static state of the same meaning */
 :root{--ui-scale:1}
 #hud{width:calc(100% / var(--ui-scale));height:calc(100% / var(--ui-scale));transform:scale(var(--ui-scale));transform-origin:0 0}
-.screen{transform:scale(var(--ui-scale))}
+.screen{transform-origin:0 0;width:calc(100% / var(--ui-scale));height:calc(100% / var(--ui-scale));transform:scale(var(--ui-scale))}
 .setrow input[type=checkbox].chk{-webkit-appearance:none;appearance:none;width:44px;height:20px;background:#100a08;border:2px solid #000;box-shadow:inset 0 0 0 1px #4a4130;cursor:pointer;position:relative;flex:none}
 .setrow input[type=checkbox].chk::after{content:'';position:absolute;left:2px;top:2px;width:14px;height:12px;background:#655944;border:1px solid #000;transition:left .08s steps(2),background .08s}
 .setrow input[type=checkbox].chk:checked::after{left:24px;background:#c8a040;box-shadow:inset 0 0 0 1px #ffe8b0}
@@ -1105,7 +1105,15 @@ rebuildKeymap(); // the effective map exists before the first surface renders
 function saveSettings(){ SETTINGS.version = SETTINGS_VERSION; try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS)); } catch (err) {} }
 /* accessibility live-applies: UI scale rides a CSS var; reduce-flashing is
    a body class the strobing animations all respect */
-function applyUIScale(){ document.documentElement.style.setProperty('--ui-scale', '' + (SETTINGS.uiScale || 1)); }
+let _uiScaleNow = 1; // effective scale (auto-fit x user pref); recomputed in applyUIScale
+function applyUIScale(){
+    // auto-fit: the UI is authored against a 1600x900 reference viewport;
+    // shrink/grow the scale so panels keep proportion on any screen (if the
+    // inner viewport is wider than 16:9 the min() picks the height axis).
+    const fit = Math.max(0.45, Math.min(1.5, Math.min(window.innerWidth / 1600, window.innerHeight / 900)));
+    _uiScaleNow = Math.max(0.45, Math.min(1.6, fit * (SETTINGS.uiScale || 1)));
+    document.documentElement.style.setProperty('--ui-scale', '' + _uiScaleNow);
+  }
 function applyFlashMode(){ document.body.classList.toggle('noflash', SETTINGS.flash === 0); }
 
 /* =====================================================================
@@ -4628,6 +4636,7 @@ function initEngine(){
   window.addEventListener('resize', onResize);
 }
 function onResize(){
+  applyUIScale();
   const w = LOW_W;
   const h = clamp(Math.round(LOW_W * window.innerHeight / Math.max(1, window.innerWidth)), 160, 300);
   renderer.setSize(w, h, false);
@@ -5161,8 +5170,8 @@ function updateDNs(dt){
     _projV.copy(d.p).project(camera);
     if (_projV.z > 1) { d.el.style.display = 'none'; continue; }
     d.el.style.display = 'block';
-    d.el.style.left = ((_projV.x * 0.5 + 0.5) * window.innerWidth) + 'px';
-    d.el.style.top = ((-_projV.y * 0.5 + 0.5) * window.innerHeight) + 'px';
+    d.el.style.left = ((_projV.x * 0.5 + 0.5) * window.innerWidth / _uiScaleNow) + 'px';
+    d.el.style.top = ((-_projV.y * 0.5 + 0.5) * window.innerHeight / _uiScaleNow) + 'px';
     d.el.style.opacity = Math.min(1, d.life * 2);
   }
 }
