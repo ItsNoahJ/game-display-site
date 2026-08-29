@@ -14,11 +14,19 @@
    *
    * How it works:
    *   1. On GitHub Pages the site derives owner/repo from its own
-   *      URL and lists the folder via the GitHub Contents API
-   *      (requires a PUBLIC repository, ~60 req/hr rate limit).
+   *      URL and lists the repository via the GitHub Trees API
+   *      (2 requests total, whatever the game count — a PUBLIC
+   *      repository is required; 60 req/hr rate limit).
    *   2. Otherwise it fetches "./games/" and parses the directory
    *      listing (works with `python -m http.server`, `npx serve`,
    *      and other listing-enabled servers).
+   *
+   * Games can live either as a single HTML file (games/MyGame.html)
+   * or as a folder (games/MyGame/index.html plus any assets — the
+   * folder's own index.html is the entry point and its internal
+   * relative links just work). Card artwork is an image named like
+   * the game, either next to it (games/MyGame.webp) or inside the
+   * folder (games/MyGame/MyGame.webp).
    *
    * Optional per-game metadata is read from <meta> tags inside the
    * game file itself:
@@ -40,6 +48,7 @@
   // Image formats accepted as card artwork next to a game file.
   // Order = preference when several formats exist for the same game.
   const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif", "svg", "avif"];
+  const IMG_RE = new RegExp("\\.(" + IMAGE_EXTS.join("|") + ")$", "i");
 
   function isDiscoverableFile(name) {
     if (/\.html?$/i.test(name)) return true;
@@ -57,48 +66,109 @@
     const repo = DISCOVERY.repo || location.pathname.split("/").filter(Boolean)[0];
     if (!owner || !repo) return [null, "Cannot determine the GitHub repository from the page URL."];
     try {
-      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/games`);
-      if (res.status === 403) return [null, "GitHub API rate limit reached (60 requests per hour per IP)."];
-      if (res.status === 404) return [null, "No `games` folder was found in the repository."];
+      const RATE = "GitHub API rate limit reached (60 requests per hour per IP).";
+      const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+      if (metaRes.status === 403) return [null, RATE];
+      if (!metaRes.ok) return [null, `GitHub API error (HTTP ${metaRes.status}).`];
+      // One recursive tree call lists every file in the repo, so discovery
+      // costs 2 requests total no matter how many games exist.
+      const meta = await metaRes.json();
+      const branch = meta.default_branch || "main";
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`
+      );
+      if (res.status === 403) return [null, RATE];
       if (!res.ok) return [null, `GitHub API error (HTTP ${res.status}).`];
       const data = await res.json();
-      if (!Array.isArray(data)) return [null, "The `games` path in the repository is not a folder."];
-      const names = data
-        .filter((e) => e.type === "file" && isDiscoverableFile(e.name))
-        .map((e) => e.name)
+      const entries = (data.tree || [])
+        .filter((e) => e.type === "blob" && e.path && e.path.toLowerCase().startsWith("games/"))
+        .map((e) => e.path.slice(6)) // strip the "games/" prefix
+        .filter((p) => {
+          const parts = p.split("/");
+          if (parts.length === 1) return /\.html?$/i.test(parts[0]) || IMG_RE.test(parts[0]);
+          // one level deep: a folder game (its index.html) or folder art
+          if (parts.length === 2) return /^index\.html?$/i.test(parts[1]) || IMG_RE.test(parts[1]);
+          return false;
+        })
         .sort(compareNames);
-      return [names, null];
+      return [entries, null];
     } catch (_) {
       return [null, "Network error while reaching the GitHub API."];
     }
   }
 
+  // Parses a directory-index page (python -m http.server, npx serve,
+  // GitHub raw listing, ...) into { names, folders }. URLs are returned
+  // decoded relative to the listed directory (folders keep no slash).
+  async function listingLinks(url) {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const names = [];
+    const folders = [];
+    doc.querySelectorAll("a[href]").forEach((a) => {
+      let href = a.getAttribute("href") || "";
+      href = href.split("#")[0].split("?")[0];
+      if (!href) return;
+      try {
+        if (/^https?:/i.test(href)) href = new URL(href).pathname;
+      } catch (_) {}
+      if (href.startsWith("/")) href = href.slice(1);
+      const segs = href.split("/").filter(Boolean);
+      const name = segs.pop() || "";
+      if (!name || name === ".." || name === ".") return;
+      let decoded;
+      try {
+        decoded = decodeURIComponent(name);
+      } catch (_) {
+        decoded = name;
+      }
+      if (href.endsWith("/")) folders.push(decoded);
+      else names.push(decoded);
+    });
+    return { names, folders };
+  }
+
   async function listViaDirectory() {
+    const entries = new Set();
     try {
-      const res = await fetch("./games/");
-      if (!res.ok) return [null, `The games folder could not be listed (HTTP ${res.status}).`];
-      const html = await res.text();
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const seen = new Set();
-      doc.querySelectorAll("a[href]").forEach((a) => {
-        let href = a.getAttribute("href") || "";
-        href = href.split("#")[0].split("?")[0];
-        if (!href) return;
-        try {
-          if (/^https?:/i.test(href)) href = new URL(href).pathname;
-        } catch (_) {}
-        if (href.startsWith("/")) href = href.slice(1);
-        const base = href.split("/").pop();
-        if (!base || base === ".." || base === "." || !isDiscoverableFile(base)) return;
-        let name;
-        try {
-          name = decodeURIComponent(base);
-        } catch (_) {
-          name = base;
-        }
-        seen.add(name);
+      const top = await listingLinks("./games/");
+      if (!top) return [null, "The games folder could not be listed."];
+      top.names.forEach((n) => {
+        if (isDiscoverableFile(n)) entries.add(n);
       });
-      return [[...seen].sort(compareNames), null];
+      // Folder games: dev servers (python http.server, npx serve, ...) serve a
+      // folder's index.html instead of a listing, so probe directly for the
+      // entry point and for same-name artwork living inside the folder.
+      const checked = new Set();
+      for (const folder of top.folders) {
+        if (checked.has(folder)) continue;
+        checked.add(folder);
+        const safe = encodeURIComponent(folder);
+        let entryOk = false;
+        for (const idx of ["index.html", "index.htm"]) {
+          try {
+            const probe = await fetch("./games/" + safe + "/" + idx);
+            if (probe.ok) {
+              entries.add(folder + "/" + idx);
+              entryOk = true;
+              break;
+            }
+          } catch (_) {}
+        }
+        if (!entryOk) continue;
+        for (const ext of IMAGE_EXTS) {
+          try {
+            const probe = await fetch("./games/" + safe + "/" + encodeURIComponent(folder + "." + ext));
+            if (probe.ok) {
+              entries.add(folder + "/" + folder + "." + ext);
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+      return [[...entries].sort(compareNames), null];
     } catch (_) {
       return [null, "The games folder could not be listed."];
     }
@@ -153,22 +223,20 @@
     return out;
   }
 
-  async function buildGame(name) {
-    const id = name.replace(/\.(html?)$/i, "");
-    const file = "./games/" + encodeURIComponent(name);
-    const meta = await fetchGameMeta(file);
-    const accent = PALETTES[hashStr(id) % PALETTES.length];
+  async function buildGame(spec) {
+    const meta = await fetchGameMeta(spec.file);
+    const accent = PALETTES[hashStr(spec.id) % PALETTES.length];
     return {
-      id,
-      title: prettify(id),
-      description: meta.description || "A self-contained single-file HTML game. Click to play.",
-      file,
+      id: spec.id,
+      title: prettify(spec.id),
+      description: meta.description || "A browser game. Click to play.",
+      file: spec.file,
       tags: meta.keywords.length ? meta.keywords : ["Arcade"],
       controls: meta.controls || "Use keyboard or mouse inside the game",
       aspect: meta.aspect || "16:9",
       accent1: accent[0],
       accent2: accent[1],
-      thumb: THUMBS[id] ? id : "auto",
+      thumb: THUMBS[spec.id] ? spec.id : "auto",
     };
   }
 
@@ -179,44 +247,79 @@
   }
 
   async function discoverGames() {
-    let names = null;
+    let entries = null;
     let error = null;
     if (isGitHubPagesHost()) {
-      [names, error] = await listViaGitHubAPI();
-      if (names === null && DISCOVERY.owner) {
+      [entries, error] = await listViaGitHubAPI();
+      if (entries === null && DISCOVERY.owner) {
         // custom-domain override: try the generic listing too
         const fb = await listViaDirectory();
         if (fb[0] !== null) {
-          names = fb[0];
+          entries = fb[0];
           error = null;
         }
       }
     } else {
-      [names, error] = await listViaDirectory();
+      [entries, error] = await listViaDirectory();
     }
-    if (names === null) return { games: [], error };
-    const htmlNames = names.filter((n) => /\.html?$/i.test(n));
-    const imageNames = names.filter((n) => !/\.html?$/i.test(n));
-    // basename (lowercased) -> best matching image file; earlier extensions win.
+    if (entries === null) return { games: [], error };
+
+    // entries: "Name.html" (single-file game), "Folder/index.html"
+    // (folder game), "Name.webp" / "Folder/Name.webp" (artwork).
+    const htmlPaths = [];
+    const imagePaths = [];
+    entries.forEach((p) => {
+      const base = p.split("/").pop();
+      if (/\.html?$/i.test(base)) htmlPaths.push(p);
+      else if (IMG_RE.test(base)) imagePaths.push(p);
+    });
+
+    // One card per game id. If both `X.html` and `X/index.html` exist,
+    // the standalone file wins (deterministic).
+    const flatIds = new Set(
+      htmlPaths.filter((p) => !p.includes("/")).map((p) => p.replace(/\.(html?)$/i, ""))
+    );
+    const gamePaths = [];
+    const seenIds = new Set();
+    htmlPaths.sort(compareNames).forEach((p) => {
+      const id = p.includes("/") ? p.split("/")[0] : p.replace(/\.(html?)$/i, "");
+      if (seenIds.has(id) || (p.includes("/") && flatIds.has(id))) return;
+      seenIds.add(id);
+      gamePaths.push(p);
+    });
+    const gameSpecs = gamePaths.map((p) =>
+      p.includes("/")
+        ? { id: p.split("/")[0], file: "./games/" + encodeURIComponent(p.split("/")[0]) + "/index.html" }
+        : { id: p.replace(/\.(html?)$/i, ""), file: "./games/" + encodeURIComponent(p) }
+    );
+
+    // basename (lowercased) -> best matching artwork file; earlier image
+    // formats win, then a flat image beats the one inside a folder.
     const artByKey = new Map();
-    imageNames
+    imagePaths
       .slice()
       .sort(
         (a, b) =>
-          (IMAGE_EXTS.indexOf(a.split(".").pop().toLowerCase()) -
-            IMAGE_EXTS.indexOf(b.split(".").pop().toLowerCase())) ||
+          (imagePriority(a) - imagePriority(b)) ||
+          (a.split("/").length - b.split("/").length) ||
           compareNames(a, b)
       )
       .forEach((f) => {
-        const key = f.replace(/\.[^.]+$/i, "").toLowerCase();
+        const base = f.split("/").pop();
+        const key = base.replace(/\.[^.]+$/i, "").toLowerCase();
         if (!artByKey.has(key)) artByKey.set(key, f);
       });
-    const games = await Promise.all(htmlNames.map(buildGame));
+    const games = await Promise.all(gameSpecs.map(buildGame));
     games.forEach((g) => {
       const art = artByKey.get(g.id.toLowerCase());
-      g.art = art ? "./games/" + encodeURIComponent(art) : null;
+      g.art = art ? "./games/" + art.split("/").map(encodeURIComponent).join("/") : null;
     });
     return { games, error: null };
+  }
+
+  function imagePriority(path) {
+    const i = IMAGE_EXTS.indexOf(path.split(".").pop().toLowerCase());
+    return i === -1 ? IMAGE_EXTS.length : i;
   }
 
   function updateHeaderCount() {
@@ -503,7 +606,7 @@
       emptyFolder.innerHTML = `
         <div class="empty-icon" aria-hidden="true">🕹️</div>
         <p>The games folder is empty.</p>
-        <p>Drop a single-file HTML game into <code>./games/</code> and reload — it appears here automatically.</p>`;
+        <p>Drop a game file — or a whole game folder with an <code>index.html</code> — into <code>./games/</code> and reload. It appears here automatically.</p>`;
       grid.appendChild(emptyFolder);
       return;
     }

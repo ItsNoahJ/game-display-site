@@ -1,8 +1,8 @@
 # Arcade — Instant Browser Games
 
-A sleek, dark-themed arcade showcase for **self-contained, single-file HTML games**.
-Every game is one `.html` file with inline CSS/JS inside `./games/`. No build step,
-no dependencies, no CDN — it runs offline and deployable to **GitHub Pages**.
+A sleek, dark-themed arcade showcase for **self-contained HTML games**. Each game
+is a single `.html` file, or a folder with an `index.html` plus any assets, inside
+`./games/`. No build step, no dependencies, no CDN — deployable to **GitHub Pages**.
 
 ## Structure
 
@@ -13,35 +13,49 @@ no dependencies, no CDN — it runs offline and deployable to **GitHub Pages**.
 │   └── app.js        Game auto-discovery, rendering, filtering, theater modal
 ├── games/
 │   ├── Delve.html    Single-file HTML game (auto-detected)
-│   └── Delve.webp    Card artwork (image matching the game name)
+│   ├── Delve.webp    Card artwork (image matching the game name)
+│   ├── FolderGame/   Multi-file game: index.html + any number of assets
+│   └── ...           Any file or folder you drop in appears automatically
 └── README.md
 ```
 
 ## Adding a new game
 
-1. **Drop the file in** — save your game as a single self-contained HTML file:
+1. **Drop it in** — two ways:
+
+   Single file — everything (CSS/JS/assets) inline in one HTML file:
    ```
    games/
    └── mygame.html
    ```
-   Keep everything (CSS, JS, assets) inside that one file. If you must use external
-   files, use relative paths from the game file (e.g. `./assets/sprite.png`) and keep
-   them inside the repo.
+   Whole folder — when a game needs multiple files, use a folder:
+   ```
+   games/
+   └── mygame/
+       ├── index.html         ← the entry point
+       ├── sprites/           ← any assets, however you like
+       └── sound.mp3
+   ```
+   Inside the folder, relative paths are normal — the game is served from its own
+   folder (`./assets/sprite.png` just works) and the iframe loads
+   `games/mygame/index.html`.
 
 2. **Push to GitHub** (or reload the page on a local server). That's it.
 
    The site scans `./games/` automatically at load:
    - **GitHub Pages:** the site derives `owner/repo` from its own URL and lists the
-     folder via the GitHub Contents API. Requires a **public** repository
-     (rate limit: ~60 requests/hour/IP). Note: newly pushed files need one normal
-     deploy — the API lists the current state of the repo.
+     repository via the GitHub Trees API (2 requests per load, whatever the game
+     count). Requires a **public** repository (rate limit: ~60 requests/hour/IP).
+     Note: newly pushed files need one normal deploy — the API lists the current
+     state of the repo.
    - **Local servers:** any server with directory listing enabled
      (`python -m http.server`, `npx serve`) — the page reads the listing directly.
 
 3. **Naming & metadata (all optional):**
-   - The card **title** is the file name, prettified (`my_game.html` → `My Game`).
+   - The card **title** is the name of the file/folder, prettified
+     (`my_game` → `My Game`).
    - The card **description, tags, and controls hint** are read from `<meta>` tags
-     in the game file's `<head>`:
+     in the entry file's `<head>`:
      ```html
      <meta name="description" content="Short hook describing the game.">
      <meta name="keywords" content="Arcade, Puzzle">
@@ -54,23 +68,24 @@ no dependencies, no CDN — it runs offline and deployable to **GitHub Pages**.
      adapts to any window can opt out with
      `<meta name="aspect-ratio" content="auto">`; other ratios are supported too
      (`<meta name="aspect-ratio" content="4:3">`).
-   - **Card artwork:** drop an image next to the game file with the same base
-     name and it becomes the card's artwork automatically:
+   - **Card artwork:** an image named like the game becomes the card's artwork:
      ```
      games/
-     ├── mygame.html
-     └── mygame.png   ← artwork (png, jpg, jpeg, webp, gif, svg, avif)
+     ├── mygame.html      ──OR──  games/
+     └── mygame.png               └── mygame/
+                                     ├── index.html
+                                     └── mygame.webp   ← inside the folder works too
      ```
-     If several formats exist for one game, the first of
-     `png → jpg → jpeg → webp → gif → svg → avif` wins. Matching is
-     case-insensitive (`MYGAME.PNG` works for `mygame.html`). Images without a
-     matching game are ignored. **Use WebP if possible** — it's the smallest
-     format by far (a raw game screenshot saved as PNG can be several MB and
-     slows down the first paint of the card).
+     Accepted formats: `png, jpg, jpeg, webp, gif, svg, avif`. If several formats
+     exist for one game, `png → jpg → jpeg → webp → gif → svg → avif` wins.
+     Matching is case-insensitive (`MYGAME.PNG` works for `mygame.html`). Images
+     without a matching game are ignored. **Use WebP if possible** — it's the
+     smallest format by far (a raw game screenshot saved as PNG can be several MB
+     and slows down the first paint of the card).
    - Thumbnails: games without artwork get a procedurally drawn canvas thumb —
      see the `THUMBS` painters in `app.js` for `id → drawer` mapping; anything
      without a painter gets a monogram tile with an accent color chosen from
-     the file name.
+     the game name.
 
 4. **Search and tag filters pick everything up automatically.**
 
